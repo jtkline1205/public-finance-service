@@ -3,7 +3,7 @@ import pool from '../db';
 
 const router = Router();
 
-export async function fetchOneColumn(walletId: string, columnName: string): Promise<number> {
+export async function fetchOneWalletsColumn(walletId: string, columnName: string): Promise<number> {
     const query = `
     SELECT ${columnName}
     FROM wallets
@@ -23,7 +23,7 @@ export async function fetchOneColumn(walletId: string, columnName: string): Prom
     }
 }
 
-export async function updateOneColumn(walletId: string, columnName: string, newValue: number): Promise<boolean> {
+export async function updateOneWalletsColumn(walletId: string, columnName: string, newValue: number): Promise<boolean> {
     const query = `
     UPDATE wallets
     SET ${columnName} = ${newValue}
@@ -43,10 +43,8 @@ export async function updateOneColumn(walletId: string, columnName: string, newV
     }
 }
 
-
 router.post('/exchange/bills', async (req: Request, res: Response): Promise<any> => {
     console.log('Received request for /exchange/bills:', req.body);
-
 
     const { walletId, denomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
@@ -83,19 +81,16 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
             receivedChipQuantity = 1
             givenBillType = "hundreds"
         }
-        console.log('receivedChipType:', receivedChipType);
-        console.log('receivedChipQuantity:', receivedChipQuantity);
-        console.log('givenBillType:', givenBillType);
 
-        let givenBillData = await fetchOneColumn(walletId, givenBillType);
+        let givenBillData = await fetchOneWalletsColumn(walletId, givenBillType);
 
         if (givenBillData >= 1) {
-            let receivedChipData = await fetchOneColumn(walletId, receivedChipType);
+            let receivedChipData = await fetchOneWalletsColumn(walletId, receivedChipType);
             if (receivedChipData != null) {
                 let newReceivedChipQuantity = receivedChipData + receivedChipQuantity;
-                await updateOneColumn(walletId, receivedChipType, newReceivedChipQuantity);
+                await updateOneWalletsColumn(walletId, receivedChipType, newReceivedChipQuantity);
                 let newGivenBillQuantity = givenBillData - 1;
-                await updateOneColumn(walletId, givenBillType, newGivenBillQuantity);
+                await updateOneWalletsColumn(walletId, givenBillType, newGivenBillQuantity);
                 await client.query('COMMIT');
                 return res.json({ success: true });
             } else {
@@ -110,9 +105,79 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
 
 
     } catch (err) {
-        console.error('Exchange error:', err);
+        console.error('Exchange bills error:', err);
         res.status(500).send('Something went wrong');
     }
 });
+
+router.post('/exchange/chips', async (req: Request, res: Response): Promise<any> => {
+    console.log('Received request for /exchange/bills:', req.body);
+
+    const { walletId, denomination } = req.body;
+    if (!walletId) return res.status(400).send('Missing walletId');
+
+    try {
+        const client = await pool.connect();
+        await client.query('BEGIN');
+
+        let receivedBillType = "ones"
+        let givenChipQuantity = 1
+        let givenChipType = "chip_ones"
+        if (denomination == 5) {
+            receivedBillType = "fives"
+            givenChipQuantity = 1
+            givenChipType = "chip_fives"
+        }
+        if (denomination == 10) {
+            receivedBillType = "tens"
+            givenChipQuantity = 2
+            givenChipType = "chip_fives"
+        }
+        if (denomination == 20) {
+            receivedBillType = "twenties"
+            givenChipQuantity = 4
+            givenChipType = "chip_fives"
+        }
+        if (denomination == 50) {
+            receivedBillType = "fifties"
+            givenChipQuantity = 2
+            givenChipType = "chip_twentyfives"
+        }
+        if (denomination == 100) {
+            receivedBillType = "hundreds"
+            givenChipQuantity = 1
+            givenChipType = "chip_hundreds"
+        }
+
+        let givenChipData = await fetchOneWalletsColumn(walletId, givenChipType);
+
+        if (givenChipData >= givenChipQuantity) {
+            let receivedBillData = await fetchOneWalletsColumn(walletId, receivedBillType);
+            if (receivedBillData != null) {
+                let newReceivedBillQuantity = receivedBillData + 1;
+                await updateOneWalletsColumn(walletId, receivedBillType, newReceivedBillQuantity);
+                let newGivenChipQuantity = givenChipData - givenChipQuantity;
+                await updateOneWalletsColumn(walletId, givenChipType, newGivenChipQuantity);
+                await client.query('COMMIT');
+                return res.json({ success: true });
+            } else {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ success: false, reason: 'Missing chip column' });
+            }
+        } else {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, reason: 'Insufficient bills' });
+        }
+
+
+
+    } catch (err) {
+        console.error('Exchange chips error:', err);
+        res.status(500).send('Something went wrong');
+    }
+
+
+});
+
 
 export default router;
