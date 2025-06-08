@@ -1,46 +1,28 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db';
+import { PoolClient } from 'pg';
 
 const router = Router();
 
-export async function fetchOneWalletsColumn(walletId: string, columnName: string): Promise<number> {
+export async function fetchOneWalletsColumn(client: PoolClient, walletId: string, columnName: string): Promise<number> {
     const query = `
     SELECT ${columnName}
     FROM wallets
     WHERE wallet_id = $1
   `;
-
-    const client = await pool.connect();
-
-    try {
-        const result = await client.query(query, [walletId]);
-        if (result.rows.length > 0) {
-            return result.rows[0][columnName];
-        }
-        return 0;
-    } finally {
-        client.release();
-    }
+    const result = await client.query(query, [walletId]);
+    return result.rows.length > 0 ? result.rows[0][columnName] : 0;
 }
 
-export async function updateOneWalletsColumn(walletId: string, columnName: string, newValue: number): Promise<boolean> {
+export async function updateOneWalletsColumn(client: PoolClient, walletId: string, columnName: string, newValue: number): Promise<boolean> {
     const query = `
     UPDATE wallets
     SET ${columnName} = ${newValue}
     WHERE wallet_id = $1
   `;
 
-    const client = await pool.connect();
-
-    try {
-        const result = await client.query(query, [walletId]);
-        if (result) {
-            return true;
-        }
-        return false;
-    } finally {
-        client.release();
-    }
+    const result = await client.query(query, [walletId]);
+    return true;
 }
 
 router.post('/exchange/bills', async (req: Request, res: Response): Promise<any> => {
@@ -48,9 +30,9 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
 
     const { walletId, denomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
+    const client = await pool.connect();
 
     try {
-        const client = await pool.connect();
         await client.query('BEGIN');
 
         let receivedChipType = "chip_ones"
@@ -86,20 +68,20 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
         console.log('receivedChipQuantity:', receivedChipQuantity);
         console.log('givenBillType:', givenBillType);
 
-        let givenBillData = await fetchOneWalletsColumn(walletId, givenBillType);
+        let givenBillData = await fetchOneWalletsColumn(client, walletId, givenBillType);
 
         console.log('givenBillData:', givenBillData);
 
         if (givenBillData >= 1) {
-            let receivedChipData = await fetchOneWalletsColumn(walletId, receivedChipType);
+            let receivedChipData = await fetchOneWalletsColumn(client, walletId, receivedChipType);
             console.log('receivedChipData:', receivedChipData);
             if (receivedChipData != null) {
                 let newReceivedChipQuantity = receivedChipData + receivedChipQuantity;
                 console.log('newReceivedChipQuantity:', newReceivedChipQuantity);
-                await updateOneWalletsColumn(walletId, receivedChipType, newReceivedChipQuantity);
+                await updateOneWalletsColumn(client, walletId, receivedChipType, newReceivedChipQuantity);
                 let newGivenBillQuantity = givenBillData - 1;
                 console.log('newGivenBillQuantity:', newGivenBillQuantity);
-                await updateOneWalletsColumn(walletId, givenBillType, newGivenBillQuantity);
+                await updateOneWalletsColumn(client, walletId, givenBillType, newGivenBillQuantity);
                 console.log('before COMMIT');
                 await client.query('COMMIT');
                 return res.json({ success: true });
@@ -125,9 +107,9 @@ router.post('/exchange/chips', async (req: Request, res: Response): Promise<any>
 
     const { walletId, denomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
+    const client = await pool.connect();
 
     try {
-        const client = await pool.connect();
         await client.query('BEGIN');
 
         let receivedBillType = "ones"
@@ -163,20 +145,20 @@ router.post('/exchange/chips', async (req: Request, res: Response): Promise<any>
         console.log('givenChipQuantity:', givenChipQuantity);
         console.log('givenChipType:', givenChipType);
 
-        let givenChipData = await fetchOneWalletsColumn(walletId, givenChipType);
+        let givenChipData = await fetchOneWalletsColumn(client, walletId, givenChipType);
 
         console.log('givenChipData:', givenChipData);
 
         if (givenChipData >= givenChipQuantity) {
-            let receivedBillData = await fetchOneWalletsColumn(walletId, receivedBillType);
+            let receivedBillData = await fetchOneWalletsColumn(client, walletId, receivedBillType);
             console.log('receivedBillData:', receivedBillData);
             if (receivedBillData != null) {
                 let newReceivedBillQuantity = receivedBillData + 1;
                 console.log('newReceivedBillQuantity:', newReceivedBillQuantity);
-                await updateOneWalletsColumn(walletId, receivedBillType, newReceivedBillQuantity);
+                await updateOneWalletsColumn(client, walletId, receivedBillType, newReceivedBillQuantity);
                 let newGivenChipQuantity = givenChipData - givenChipQuantity;
                 console.log('newGivenChipQuantity:', newGivenChipQuantity);
-                await updateOneWalletsColumn(walletId, givenChipType, newGivenChipQuantity);
+                await updateOneWalletsColumn(client, walletId, givenChipType, newGivenChipQuantity);
                 console.log('before COMMIT');
                 await client.query('COMMIT');
                 return res.json({ success: true });
