@@ -106,7 +106,7 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
             } else {
                 console.log('before ROLLBACK 1');
                 await client.query('ROLLBACK');
-                return res.status(400).json({ success: false, reason: 'Missing chip column' });
+                return res.status(400).json({ success: false, reason: 'Missing column' });
             }
         } else {
             console.log('before ROLLBACK 2');
@@ -159,24 +159,36 @@ router.post('/exchange/chips', async (req: Request, res: Response): Promise<any>
             givenChipType = "chip_hundreds"
         }
 
+        console.log('receivedBillType:', receivedBillType);
+        console.log('givenChipQuantity:', givenChipQuantity);
+        console.log('givenChipType:', givenChipType);
+
         let givenChipData = await fetchOneWalletsColumn(walletId, givenChipType);
+
+        console.log('givenChipData:', givenChipData);
 
         if (givenChipData >= givenChipQuantity) {
             let receivedBillData = await fetchOneWalletsColumn(walletId, receivedBillType);
+            console.log('receivedBillData:', receivedBillData);
             if (receivedBillData != null) {
                 let newReceivedBillQuantity = receivedBillData + 1;
+                console.log('newReceivedBillQuantity:', newReceivedBillQuantity);
                 await updateOneWalletsColumn(walletId, receivedBillType, newReceivedBillQuantity);
                 let newGivenChipQuantity = givenChipData - givenChipQuantity;
+                console.log('newGivenChipQuantity:', newGivenChipQuantity);
                 await updateOneWalletsColumn(walletId, givenChipType, newGivenChipQuantity);
+                console.log('before COMMIT');
                 await client.query('COMMIT');
                 return res.json({ success: true });
             } else {
+                console.log('before ROLLBACK 1');
                 await client.query('ROLLBACK');
-                return res.status(400).json({ success: false, reason: 'Missing chip column' });
+                return res.status(400).json({ success: false, reason: 'Missing column' });
             }
         } else {
+            console.log('before ROLLBACK 1');
             await client.query('ROLLBACK');
-            return res.status(400).json({ success: false, reason: 'Insufficient bills' });
+            return res.status(400).json({ success: false, reason: 'Insufficient chips' });
         }
 
 
