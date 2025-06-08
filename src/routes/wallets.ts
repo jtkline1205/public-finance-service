@@ -82,27 +82,37 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
             givenBillType = "hundreds"
         }
 
+        console.log('receivedChipType:', receivedChipType);
+        console.log('receivedChipQuantity:', receivedChipQuantity);
+        console.log('givenBillType:', givenBillType);
+
         let givenBillData = await fetchOneWalletsColumn(walletId, givenBillType);
+
+        console.log('givenBillData:', givenBillData);
 
         if (givenBillData >= 1) {
             let receivedChipData = await fetchOneWalletsColumn(walletId, receivedChipType);
+            console.log('receivedChipData:', receivedChipData);
             if (receivedChipData != null) {
                 let newReceivedChipQuantity = receivedChipData + receivedChipQuantity;
+                console.log('newReceivedChipQuantity:', newReceivedChipQuantity);
                 await updateOneWalletsColumn(walletId, receivedChipType, newReceivedChipQuantity);
                 let newGivenBillQuantity = givenBillData - 1;
+                console.log('newGivenBillQuantity:', newGivenBillQuantity);
                 await updateOneWalletsColumn(walletId, givenBillType, newGivenBillQuantity);
+                console.log('before COMMIT');
                 await client.query('COMMIT');
                 return res.json({ success: true });
             } else {
+                console.log('before ROLLBACK 1');
                 await client.query('ROLLBACK');
                 return res.status(400).json({ success: false, reason: 'Missing chip column' });
             }
         } else {
+            console.log('before ROLLBACK 2');
             await client.query('ROLLBACK');
             return res.status(400).json({ success: false, reason: 'Insufficient bills' });
         }
-
-
 
     } catch (err) {
         console.error('Exchange bills error:', err);
@@ -111,7 +121,7 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
 });
 
 router.post('/exchange/chips', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /exchange/bills:', req.body);
+    console.log('Received request for /exchange/chips:', req.body);
 
     const { walletId, denomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
