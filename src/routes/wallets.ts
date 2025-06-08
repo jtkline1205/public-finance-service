@@ -83,21 +83,11 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
             receivedChipQuantity = 1
             givenBillType = "hundreds"
         }
+        console.log('receivedChipType:', receivedChipType);
+        console.log('receivedChipQuantity:', receivedChipQuantity);
+        console.log('givenBillType:', givenBillType);
 
-        let givenBillData = await fetchOneColumn(walletId, givenBillType)
-
-        if (givenBillData >= 1) {
-            let receivedChipData = await fetchOneColumn(walletId, receivedChipType);
-            if (receivedChipData != null) {
-                let newReceivedChipQuantity = receivedChipData + receivedChipQuantity;
-                updateOneColumn(walletId, receivedChipType, newReceivedChipQuantity);
-                let newGivenBillQuantity = givenBillData - 1
-                updateOneColumn(walletId, givenBillType, newGivenBillQuantity);
-                return true;
-            } else {
-                return false;
-            }
-        }
+        let givenBillData = await fetchOneColumn(walletId, givenBillType);
 
         if (givenBillData >= 1) {
             let receivedChipData = await fetchOneColumn(walletId, receivedChipType);
