@@ -45,6 +45,9 @@ export async function updateOneColumn(walletId: string, columnName: string, newV
 
 
 router.post('/exchange/bills', async (req: Request, res: Response): Promise<any> => {
+    console.log('Received request for /exchange/bills:', req.body);
+
+
     const { walletId, denomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
 
@@ -95,6 +98,26 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
                 return false;
             }
         }
+
+        if (givenBillData >= 1) {
+            let receivedChipData = await fetchOneColumn(walletId, receivedChipType);
+            if (receivedChipData != null) {
+                let newReceivedChipQuantity = receivedChipData + receivedChipQuantity;
+                await updateOneColumn(walletId, receivedChipType, newReceivedChipQuantity);
+                let newGivenBillQuantity = givenBillData - 1;
+                await updateOneColumn(walletId, givenBillType, newGivenBillQuantity);
+                await client.query('COMMIT');
+                return res.json({ success: true });
+            } else {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ success: false, reason: 'Missing chip column' });
+            }
+        } else {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, reason: 'Insufficient bills' });
+        }
+
+
 
     } catch (err) {
         console.error('Exchange error:', err);
