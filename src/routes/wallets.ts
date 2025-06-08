@@ -99,6 +99,8 @@ router.post('/exchange/bills', async (req: Request, res: Response): Promise<any>
     } catch (err) {
         console.error('Exchange bills error:', err);
         res.status(500).send('Something went wrong');
+    } finally {
+        client.release();
     }
 });
 
@@ -178,6 +180,8 @@ router.post('/exchange/chips', async (req: Request, res: Response): Promise<any>
     } catch (err) {
         console.error('Exchange chips error:', err);
         res.status(500).send('Something went wrong');
+    } finally {
+        client.release();
     }
 
 
