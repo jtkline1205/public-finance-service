@@ -35,7 +35,7 @@ export async function fetchOnePlayersColumn(client: PoolClient, playerId: string
     return result.rows.length > 0 ? result.rows[0][columnName] : 0;
 }
 
-export async function updateOneWalletsColumn(client: PoolClient, walletId: string, columnName: string, newValue: number): Promise<boolean> {
+export async function updateOneWalletsColumn(client: PoolClient, walletId: string, columnName: string, newValue: any): Promise<boolean> {
     const query = `
     UPDATE wallets
     SET ${columnName} = ${newValue}
@@ -570,7 +570,15 @@ router.post('/atm/card', async (req: Request, res: Response): Promise<any> => {
     try {
         await client.query('BEGIN');
 
-
+        let debitCard = await fetchOneWalletsColumn(client, atmId, "debit_card");
+        if (debitCard) {
+            await updateOneWalletsColumn(client, atmId, "debit_card", false);
+            await updateOneAtmsColumn(client, atmId, "display_state", "home");
+            await updateOneAtmsColumn(client, atmId, "entry", "0");
+        } else {
+            await updateOneWalletsColumn(client, atmId, "debit_card", true);
+            await updateOneAtmsColumn(client, atmId, "display_state", "insert");
+        }
 
         await client.query('COMMIT');
         return res.json({ success: true });
