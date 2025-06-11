@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db';
-import { PoolClient } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { ItemStack } from '../ItemStack';
 
 const router = Router();
@@ -363,74 +363,15 @@ router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
         } else if (word == "Enter") {
             if (displayState == "initiate") {
                 let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-
-                if (entry > 0) {
+                if (parseFloat(entry) > 0) {
                     await updateOneAtmsColumn(client, atmId, "display_state", "confirm");
                 }
             } else if (displayState == "confirm") {
-                await updateOneAtmsColumn(client, atmId, "display_state", "home");
-                let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-                let balance = await fetchOnePlayersColumn(client, atmId, "account_balance");
-
-                if (entry > 0 && entry <= balance + 3) {
-                    balance = balance - entry - 3;
-                    await updateOnePlayersColumn(client, atmId, "account_balance", balance);
-                    let newStack = ItemStack.generateBillStackFromTotal(entry);
-                    let ones = await fetchOneWalletsColumn(client, atmId, "ones");
-                    let fives = await fetchOneWalletsColumn(client, atmId, "fives");
-                    let tens = await fetchOneWalletsColumn(client, atmId, "tens");
-                    let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
-                    let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
-                    let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
-                    let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
-                    let billStack = new ItemStack(billMap);
-                    billStack = billStack.add(newStack);
-                    await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
-                    await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
-                    await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
-                    await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
-                    await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
-                    await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
-
-                }
-
+                await processWithdrawal(client, atmId);
             } else if (displayState == "balance" || displayState == "activity") {
                 await updateOneAtmsColumn(client, atmId, "display_state", "home");
             } else if (displayState == "deposit") {
-                let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-                let ones = await fetchOneWalletsColumn(client, atmId, "ones");
-                let fives = await fetchOneWalletsColumn(client, atmId, "fives");
-                let tens = await fetchOneWalletsColumn(client, atmId, "tens");
-                let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
-                let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
-                let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
-                let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
-                let billStack = new ItemStack(billMap);
-                let stackToRemove = billStack.findBillCombination(entry);
-                if (stackToRemove != null) {
-                    billStack = billStack.subtract(stackToRemove);
-                    let accountBalance = await fetchOnePlayersColumn(client, atmId, "account_balance");
-                    if (isNaN(parseFloat(entry))) {
-                        throw new Error("Invalid entry amount");
-                    }
-
-                    let newAccountBalance: string = (parseFloat(accountBalance) + parseFloat(entry)).toString();
-
-                    console.log(parseFloat(accountBalance));
-                    console.log(parseFloat(entry));
-                    console.log(newAccountBalance);
-
-                    await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
-                    await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
-                    await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
-                    await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
-                    await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
-                    await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
-                    await updateOnePlayersColumn(client, atmId, "account_balance", newAccountBalance);
-                    await updateOneAtmsColumn(client, atmId, "display_state", "home");
-
-                }
-
+                await processDeposit(client, atmId);
             }
         }
         await client.query('COMMIT');
@@ -442,6 +383,63 @@ router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
         client.release();
     }
 });
+
+async function processDeposit(client: PoolClient, atmId: string) {
+    let entry = await fetchOneAtmsColumn(client, atmId, "entry");
+    let ones = await fetchOneWalletsColumn(client, atmId, "ones");
+    let fives = await fetchOneWalletsColumn(client, atmId, "fives");
+    let tens = await fetchOneWalletsColumn(client, atmId, "tens");
+    let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
+    let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
+    let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
+    let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
+    let billStack = new ItemStack(billMap);
+    let stackToRemove = billStack.findBillCombination(parseFloat(entry));
+    if (stackToRemove != null) {
+        billStack = billStack.subtract(stackToRemove);
+        let accountBalance = await fetchOnePlayersColumn(client, atmId, "account_balance");
+        if (isNaN(parseFloat(entry))) {
+            throw new Error("Invalid entry amount");
+        }
+        let newAccountBalance: string = (parseFloat(accountBalance) + parseFloat(entry)).toString();
+        await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
+        await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
+        await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
+        await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
+        await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
+        await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
+        await updateOnePlayersColumn(client, atmId, "account_balance", newAccountBalance);
+        await updateOneAtmsColumn(client, atmId, "display_state", "home");
+    }
+}
+
+async function processWithdrawal(client: PoolClient, atmId: string) {
+    await updateOneAtmsColumn(client, atmId, "display_state", "home");
+    let entry = await fetchOneAtmsColumn(client, atmId, "entry");
+    let balance = await fetchOnePlayersColumn(client, atmId, "account_balance");
+
+    if (parseFloat(entry) > 0 && parseFloat(entry) <= parseFloat(balance) + 3) {
+        await updateOnePlayersColumn(client, atmId, "account_balance", (parseFloat(balance) - parseFloat(entry) - 3).toString());
+        let newStack = ItemStack.generateBillStackFromTotal(entry);
+        let ones = await fetchOneWalletsColumn(client, atmId, "ones");
+        let fives = await fetchOneWalletsColumn(client, atmId, "fives");
+        let tens = await fetchOneWalletsColumn(client, atmId, "tens");
+        let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
+        let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
+        let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
+        let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
+        let billStack = new ItemStack(billMap);
+        billStack = billStack.add(newStack);
+        await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
+        await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
+        await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
+        await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
+        await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
+        await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
+
+    }
+
+}
 
 router.post('/atm/control', async (req: Request, res: Response): Promise<any> => {
     console.log('Received request for /atm/control:', req.body);
@@ -461,29 +459,7 @@ router.post('/atm/control', async (req: Request, res: Response): Promise<any> =>
                 await updateOneAtmsColumn(client, atmId, "entry", "0");
                 await updateOneAtmsColumn(client, atmId, "display_state", "initiate");
             } else if (displayState == "confirm") {
-                await updateOneAtmsColumn(client, atmId, "display_state", "home");
-                let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-                let balance = await fetchOnePlayersColumn(client, atmId, "account_balance");
-                if (entry > 0 && entry <= balance + 3) {
-                    balance = balance - entry - 3;
-                    await updateOnePlayersColumn(client, atmId, "account_balance", balance);
-                    let newStack = ItemStack.generateBillStackFromTotal(entry);
-                    let ones = await fetchOneWalletsColumn(client, atmId, "ones");
-                    let fives = await fetchOneWalletsColumn(client, atmId, "fives");
-                    let tens = await fetchOneWalletsColumn(client, atmId, "tens");
-                    let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
-                    let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
-                    let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
-                    let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
-                    let billStack = new ItemStack(billMap);
-                    billStack = billStack.add(newStack);
-                    await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
-                    await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
-                    await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
-                    await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
-                    await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
-                    await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
-                }
+                await processWithdrawal(client, atmId);
             }
         } else if (designator == "sw") {
             if (displayState == "home") {
@@ -503,29 +479,7 @@ router.post('/atm/control', async (req: Request, res: Response): Promise<any> =>
             } else if (displayState == "confirm") {
                 await updateOneAtmsColumn(client, atmId, "display_state", "home");
             } else if (displayState == "deposit") {
-                let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-                let ones = await fetchOneWalletsColumn(client, atmId, "ones");
-                let fives = await fetchOneWalletsColumn(client, atmId, "fives");
-                let tens = await fetchOneWalletsColumn(client, atmId, "tens");
-                let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
-                let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
-                let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
-                let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
-                let billStack = new ItemStack(billMap);
-                let stackToRemove = billStack.findBillCombination(entry);
-                if (stackToRemove != null) {
-                    billStack = billStack.subtract(stackToRemove);
-                    let accountBalance = await fetchOnePlayersColumn(client, atmId, "account_balance");
-                    let newAccountBalance = accountBalance + entry;
-                    await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
-                    await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
-                    await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
-                    await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
-                    await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
-                    await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
-                    await updateOnePlayersColumn(client, atmId, "account_balance", newAccountBalance);
-                    await updateOneAtmsColumn(client, atmId, "display_state", "home");
-                }
+                await processDeposit(client, atmId);
             }
         }
         await client.query('COMMIT');
@@ -550,13 +504,10 @@ router.post('/atm/digit', async (req: Request, res: Response): Promise<any> => {
         let displayState = await fetchOneAtmsColumn(client, atmId, "display_state");
         if (displayState == "deposit" || displayState == "initiate") {
             let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-            let newEntry = entry;
             if (entry == null) {
-                newEntry = digit;
-                await updateOneAtmsColumn(client, atmId, "entry", newEntry);
+                await updateOneAtmsColumn(client, atmId, "entry", digit);
             } else if (entry.length < 9) {
-                newEntry = entry + digit;
-                await updateOneAtmsColumn(client, atmId, "entry", newEntry);
+                await updateOneAtmsColumn(client, atmId, "entry", entry + digit);
             }
         }
 
