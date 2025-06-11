@@ -410,7 +410,13 @@ router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
                 if (stackToRemove != null) {
                     billStack = billStack.subtract(stackToRemove);
                     let accountBalance = await fetchOnePlayersColumn(client, atmId, "account_balance");
+
                     let newAccountBalance = accountBalance + entry;
+
+                    console.log(accountBalance);
+                    console.log(entry);
+                    console.log(newAccountBalance);
+
                     await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
                     await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
                     await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
