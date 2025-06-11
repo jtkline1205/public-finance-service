@@ -8,8 +8,12 @@
         "skipLibCheck": true,
         "outDir": "dist"
     },
+    // "include": [
+    //     "src/index.ts",
+    //     "src/db.ts"
+    // ]
     "include": [
-        "src/index.ts",
-        "src/db.ts"
+        "src",
+        "tests"
     ]
 }

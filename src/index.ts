@@ -3,7 +3,6 @@ import cors from 'cors';
 import pool from './db';
 import walletsRouter from './routes/wallets';
 
-
 const app = express();
 const port = 3000;
 
