@@ -410,11 +410,14 @@ router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
                 if (stackToRemove != null) {
                     billStack = billStack.subtract(stackToRemove);
                     let accountBalance = await fetchOnePlayersColumn(client, atmId, "account_balance");
+                    if (isNaN(parseFloat(entry))) {
+                        throw new Error("Invalid entry amount");
+                    }
 
-                    let newAccountBalance = accountBalance + entry;
+                    let newAccountBalance = accountBalance + parseFloat(entry);
 
                     console.log(accountBalance);
-                    console.log(entry);
+                    console.log(parseFloat(entry));
                     console.log(newAccountBalance);
 
                     await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
