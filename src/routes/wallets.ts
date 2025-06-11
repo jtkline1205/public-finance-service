@@ -443,11 +443,11 @@ router.post('/atm/control', async (req: Request, res: Response): Promise<any> =>
     try {
         await client.query('BEGIN');
         let displayState = await fetchOneAtmsColumn(client, atmId, "display_state");
-        if (designator == 0) {
+        if (designator == "nw") {
             if (displayState == "home") {
                 await updateOneAtmsColumn(client, atmId, "display_state", "balance");
             }
-        } else if (designator == 1) {
+        } else if (designator == "ne") {
             if (displayState == "home") {
                 await updateOneAtmsColumn(client, atmId, "entry", "0");
                 await updateOneAtmsColumn(client, atmId, "display_state", "initiate");
@@ -476,11 +476,11 @@ router.post('/atm/control', async (req: Request, res: Response): Promise<any> =>
                     await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
                 }
             }
-        } else if (designator == 2) {
+        } else if (designator == "sw") {
             if (displayState == "home") {
                 await updateOneAtmsColumn(client, atmId, "display_state", "activity");
             }
-        } else if (designator == 3) {
+        } else if (designator == "sw") {
             if (displayState == "home") {
                 await updateOneAtmsColumn(client, atmId, "entry", "0");
                 await updateOneAtmsColumn(client, atmId, "display_state", "deposit");
