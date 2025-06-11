@@ -414,9 +414,9 @@ router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
                         throw new Error("Invalid entry amount");
                     }
 
-                    let newAccountBalance = accountBalance + parseFloat(entry);
+                    let newAccountBalance: string = (parseFloat(accountBalance) + parseFloat(entry)).toString();
 
-                    console.log(accountBalance);
+                    console.log(parseFloat(accountBalance));
                     console.log(parseFloat(entry));
                     console.log(newAccountBalance);
 
