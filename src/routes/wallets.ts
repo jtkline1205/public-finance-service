@@ -38,33 +38,33 @@ export async function fetchOnePlayersColumn(client: PoolClient, playerId: string
 export async function updateOneWalletsColumn(client: PoolClient, walletId: string, columnName: string, newValue: any): Promise<boolean> {
     const query = `
     UPDATE wallets
-    SET ${columnName} = ${newValue}
+    SET ${columnName} = $2
     WHERE wallet_id = $1
   `;
 
-    const result = await client.query(query, [walletId]);
+    const result = await client.query(query, [walletId, newValue]);
     return true;
 }
 
 export async function updateOneAtmsColumn(client: PoolClient, atmId: string, columnName: string, newValue: string): Promise<boolean> {
     const query = `
     UPDATE atms
-    SET ${columnName} = ${newValue}
+    SET ${columnName} = $2
     WHERE atm_id = $1
   `;
 
-    const result = await client.query(query, [atmId]);
+    const result = await client.query(query, [atmId, newValue]);
     return true;
 }
 
 export async function updateOnePlayersColumn(client: PoolClient, playerId: string, columnName: string, newValue: string): Promise<boolean> {
     const query = `
     UPDATE players
-    SET ${columnName} = ${newValue}
+    SET ${columnName} = $2
     WHERE player_id = $1
   `;
 
-    const result = await client.query(query, [playerId]);
+    const result = await client.query(query, [playerId, newValue]);
     return true;
 }
 
