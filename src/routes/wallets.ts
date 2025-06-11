@@ -473,7 +473,7 @@ router.post('/atm/control', async (req: Request, res: Response): Promise<any> =>
                 await updateOneAtmsColumn(client, atmId, "display_state", "home");
             } else if (displayState == "initiate") {
                 let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-                if (entry > 0) {
+                if (parseFloat(entry) > 0) {
                     await updateOneAtmsColumn(client, atmId, "display_state", "home");
                 }
             } else if (displayState == "confirm") {
