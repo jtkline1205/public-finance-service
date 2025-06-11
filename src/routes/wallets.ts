@@ -350,17 +350,17 @@ router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
         await client.query('BEGIN');
         let displayState = await fetchOneAtmsColumn(client, atmId, "display_state");
 
-        if (word == "cancel") {
+        if (word == "Cancel") {
             if (displayState != "insert") {
                 await updateOneAtmsColumn(client, atmId, "display_state", "home");
             }
-        } else if (word == "clear") {
+        } else if (word == "Clear") {
             if (displayState == "balance" || displayState == "activity") {
                 await updateOneAtmsColumn(client, atmId, "display_state", "home");
             } else if (displayState == "initiate" || displayState == "deposit") {
                 await updateOneAtmsColumn(client, atmId, "entry", "0");
             }
-        } else if (word == "enter") {
+        } else if (word == "Enter") {
             if (displayState == "initiate") {
                 let entry = await fetchOneAtmsColumn(client, atmId, "entry");
 
@@ -480,7 +480,7 @@ router.post('/atm/control', async (req: Request, res: Response): Promise<any> =>
             if (displayState == "home") {
                 await updateOneAtmsColumn(client, atmId, "display_state", "activity");
             }
-        } else if (designator == "sw") {
+        } else if (designator == "se") {
             if (displayState == "home") {
                 await updateOneAtmsColumn(client, atmId, "entry", "0");
                 await updateOneAtmsColumn(client, atmId, "display_state", "deposit");
