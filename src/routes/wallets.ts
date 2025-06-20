@@ -1,82 +1,18 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db';
-import { Pool, PoolClient } from 'pg';
-import { ItemStack } from '../ItemStack';
+import { fetchOneAtmsColumn, fetchOneWalletsColumn, updateOneWalletsColumn, updateOneAtmsColumn, updateOnePlayersColumn, processDeposit, processWithdrawal, addChip, removeChip } from '../services/walletService';
 
 const router = Router();
 
-export async function fetchOneWalletsColumn(client: PoolClient, walletId: string, columnName: string): Promise<number> {
-    const query = `
-    SELECT ${columnName}
-    FROM wallets
-    WHERE wallet_id = $1
-  `;
-    const result = await client.query(query, [walletId]);
-    return result.rows.length > 0 ? result.rows[0][columnName] : 0;
-}
-
-export async function fetchOneAtmsColumn(client: PoolClient, atmId: string, columnName: string): Promise<any> {
-    const query = `
-    SELECT ${columnName}
-    FROM atms
-    WHERE atm_id = $1
-  `;
-    const result = await client.query(query, [atmId]);
-    return result.rows.length > 0 ? result.rows[0][columnName] : 0;
-}
-
-export async function fetchOnePlayersColumn(client: PoolClient, playerId: string, columnName: string): Promise<any> {
-    const query = `
-    SELECT ${columnName}
-    FROM players
-    WHERE player_id = $1
-  `;
-    const result = await client.query(query, [playerId]);
-    return result.rows.length > 0 ? result.rows[0][columnName] : 0;
-}
-
-export async function updateOneWalletsColumn(client: PoolClient, walletId: string, columnName: string, newValue: any): Promise<boolean> {
-    const query = `
-    UPDATE wallets
-    SET ${columnName} = $2
-    WHERE wallet_id = $1
-  `;
-
-    const result = await client.query(query, [walletId, newValue]);
-    return true;
-}
-
-export async function updateOneAtmsColumn(client: PoolClient, atmId: string, columnName: string, newValue: string): Promise<boolean> {
-    const query = `
-    UPDATE atms
-    SET ${columnName} = $2
-    WHERE atm_id = $1
-  `;
-
-    const result = await client.query(query, [atmId, newValue]);
-    return true;
-}
-
-export async function updateOnePlayersColumn(client: PoolClient, playerId: string, columnName: string, newValue: string): Promise<boolean> {
-    const query = `
-    UPDATE players
-    SET ${columnName} = $2
-    WHERE player_id = $1
-  `;
-
-    const result = await client.query(query, [playerId, newValue]);
-    return true;
-}
-
 router.post('/exchange/bills', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /exchange/bills:', req.body);
-
     const { walletId, denomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
     const client = await pool.connect();
 
     try {
         await client.query('BEGIN');
+
+
 
         let receivedChipType = "chip_ones"
         let receivedChipQuantity = 1
@@ -203,8 +139,6 @@ router.post('/exchange/chips', async (req: Request, res: Response): Promise<any>
 });
 
 router.post('/break/bills', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /break/bills:', req.body);
-
     const { walletId, denomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
     const client = await pool.connect();
@@ -259,8 +193,6 @@ router.post('/break/bills', async (req: Request, res: Response): Promise<any> =>
 });
 
 router.post('/change/chips', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /change/chips:', req.body);
-
     const { walletId, givenDenomination, receivedDenomination } = req.body;
     if (!walletId) return res.status(400).send('Missing walletId');
     const client = await pool.connect();
@@ -341,7 +273,6 @@ router.post('/change/chips', async (req: Request, res: Response): Promise<any> =
 });
 
 router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /atm/word:', req.body);
     const { atmId, word } = req.body;
     if (!atmId) return res.status(400).send('Missing atmId');
     const client = await pool.connect();
@@ -384,65 +315,7 @@ router.post('/atm/word', async (req: Request, res: Response): Promise<any> => {
     }
 });
 
-async function processDeposit(client: PoolClient, atmId: string) {
-    let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-    let ones = await fetchOneWalletsColumn(client, atmId, "ones");
-    let fives = await fetchOneWalletsColumn(client, atmId, "fives");
-    let tens = await fetchOneWalletsColumn(client, atmId, "tens");
-    let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
-    let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
-    let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
-    let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
-    let billStack = new ItemStack(billMap);
-    let stackToRemove = billStack.findBillCombination(parseFloat(entry));
-    if (stackToRemove != null) {
-        billStack = billStack.subtract(stackToRemove);
-        let accountBalance = await fetchOnePlayersColumn(client, atmId, "account_balance");
-        if (isNaN(parseFloat(entry))) {
-            throw new Error("Invalid entry amount");
-        }
-        let newAccountBalance: string = (parseFloat(accountBalance) + parseFloat(entry)).toString();
-        await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
-        await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
-        await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
-        await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
-        await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
-        await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
-        await updateOnePlayersColumn(client, atmId, "account_balance", newAccountBalance);
-        await updateOneAtmsColumn(client, atmId, "display_state", "home");
-    }
-}
-
-async function processWithdrawal(client: PoolClient, atmId: string) {
-    await updateOneAtmsColumn(client, atmId, "display_state", "home");
-    let entry = await fetchOneAtmsColumn(client, atmId, "entry");
-    let balance = await fetchOnePlayersColumn(client, atmId, "account_balance");
-
-    if (parseFloat(entry) > 0 && parseFloat(entry) <= parseFloat(balance) + 3) {
-        await updateOnePlayersColumn(client, atmId, "account_balance", (parseFloat(balance) - parseFloat(entry) - 3).toString());
-        let newStack = ItemStack.generateBillStackFromTotal(entry);
-        let ones = await fetchOneWalletsColumn(client, atmId, "ones");
-        let fives = await fetchOneWalletsColumn(client, atmId, "fives");
-        let tens = await fetchOneWalletsColumn(client, atmId, "tens");
-        let twenties = await fetchOneWalletsColumn(client, atmId, "twenties");
-        let fifties = await fetchOneWalletsColumn(client, atmId, "fifties");
-        let hundreds = await fetchOneWalletsColumn(client, atmId, "hundreds");
-        let billMap = { ONE: ones, FIVE: fives, TEN: tens, TWENTY: twenties, FIFTY: fifties, HUNDRED: hundreds };
-        let billStack = new ItemStack(billMap);
-        billStack = billStack.add(newStack);
-        await updateOneWalletsColumn(client, atmId, "ones", billStack.count("ONE"));
-        await updateOneWalletsColumn(client, atmId, "fives", billStack.count("FIVE"));
-        await updateOneWalletsColumn(client, atmId, "tens", billStack.count("TEN"));
-        await updateOneWalletsColumn(client, atmId, "twenties", billStack.count("TWENTY"));
-        await updateOneWalletsColumn(client, atmId, "fifties", billStack.count("FIFTY"));
-        await updateOneWalletsColumn(client, atmId, "hundreds", billStack.count("HUNDRED"));
-
-    }
-
-}
-
 router.post('/atm/control', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /atm/control:', req.body);
     const { atmId, designator } = req.body;
     if (!atmId) return res.status(400).send('Missing atmId');
     const client = await pool.connect();
@@ -493,7 +366,6 @@ router.post('/atm/control', async (req: Request, res: Response): Promise<any> =>
 });
 
 router.post('/atm/digit', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /atm/digit:', req.body);
     const { atmId, digit } = req.body;
     if (!atmId) return res.status(400).send('Missing atmId');
     const client = await pool.connect();
@@ -522,7 +394,6 @@ router.post('/atm/digit', async (req: Request, res: Response): Promise<any> => {
 });
 
 router.post('/atm/card', async (req: Request, res: Response): Promise<any> => {
-    console.log('Received request for /atm/card:', req.body);
     const { atmId } = req.body;
     if (!atmId) return res.status(400).send('Missing atmId');
     const client = await pool.connect();
@@ -543,12 +414,59 @@ router.post('/atm/card', async (req: Request, res: Response): Promise<any> => {
         await client.query('COMMIT');
         return res.json({ success: true });
     } catch (err) {
-        console.error('ATM card error:', err);
-        res.status(500).send('Something went wrong');
+        res.status(500).send('ATM card error');
     } finally {
         client.release();
     }
 });
 
+router.post('/:walletId/chips', async (req: Request, res: Response): Promise<any> => {
+    const { walletId } = req.params;
+    const { denomination } = req.body;
+    if (!walletId) return res.status(400).send('Missing walletId');
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+        await addChip(client, walletId, denomination);
+        await client.query('COMMIT');
+        return res.status(200).json({ message: 'Chip added successfully' });
+    } catch (err) {
+        res.status(500).send('add chip error');
+    } finally {
+        client.release();
+    }
+});
+
+router.delete('/:walletId/chips', async (req: Request, res: Response): Promise<any> => {
+    const { walletId } = req.params;
+    const { denomination } = req.body;
+    if (!walletId) return res.status(400).send('Missing walletId');
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+        const success = await removeChip(client, walletId, denomination);
+        await client.query('COMMIT');
+
+        if (!success) {
+            return res.status(400).json({
+                error: 'Insufficient chips',
+                walletId,
+                denomination
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Chip removed successfully',
+            walletId,
+            denomination
+        });
+    } catch (error) {
+        return res.status(500).json({ error: 'Failed to remove chip' })
+    } finally {
+        client.release();
+    }
+});
 
 export default router;
