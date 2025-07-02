@@ -1,28 +1,32 @@
+import {
+  ChipCounts,
+  ALL_DENOMINATIONS,
+  CHIP_DENOMINATION_LIST_DESCENDING,
+  BILL_DENOMINATION_LIST_DESCENDING,
+  ChipDenomination
+} from "../constants/denominations";
+
 export class ItemStack {
   private items: Record<string, number>;
 
-  private static readonly BILL_DENOMINATION_LIST_DESCENDING = [
-    "HUNDRED", "FIFTY", "TWENTY", "TEN", "FIVE", "ONE"
-  ] as const;
-
-  private static readonly CHIP_DENOMINATION_LIST_DESCENDING = [
-    "HUNDRED", "TWENTY_FIVE", "FIVE", "TWO_FIFTY", "ONE"
-  ] as const;
-
-  private static resource_name_map: Record<string, number> = {
-    ZERO: 0.0,
-    ONE: 1.0,
-    TWO_FIFTY: 2.50,
-    FIVE: 5.0,
-    TEN: 10.0,
-    TWENTY: 20.0,
-    TWENTY_FIVE: 25.0,
-    FIFTY: 50.0,
-    HUNDRED: 100.0
-  }
-
   constructor(initialItems: Record<string, number> = {}) {
     this.items = { ...initialItems };
+  }
+
+  static chipStackFromChipCounts(counts: ChipCounts): ItemStack {
+    let chipStack = ItemStack.emptyChipStack();
+
+    // chipStack = chipStack.modify('ONE', counts.ONE);
+    // chipStack = chipStack.modify('TWO_FIFTY', counts.TWO_FIFTY);
+    // chipStack = chipStack.modify('FIVE', counts.FIVE);
+    // chipStack = chipStack.modify('TWENTY_FIVE', counts.TWENTY_FIVE);
+    // chipStack = chipStack.modify('HUNDRED', counts.HUNDRED);
+
+    for (const denomination of CHIP_DENOMINATION_LIST_DESCENDING) {
+      chipStack = chipStack.modify(denomination, counts[denomination]);
+    }
+
+    return chipStack;
   }
 
   static emptyChipStack(): ItemStack {
@@ -48,7 +52,7 @@ export class ItemStack {
 
   findBillCombination(total: number): ItemStack | null {
     const itemList: string[] = [];
-    for (const denomination of ItemStack.BILL_DENOMINATION_LIST_DESCENDING) {
+    for (const denomination of BILL_DENOMINATION_LIST_DESCENDING) {
       const count = this.items[denomination] || 0;
       for (let i = 0; i < count; i++) {
         itemList.push(denomination);
@@ -75,7 +79,7 @@ export class ItemStack {
       return null;
     } else {
       const item = items[0];
-      const newTarget = target - ItemStack.resource_name_map[item];
+      const newTarget = target - ALL_DENOMINATIONS[item];
       const withItem = this.findItemCombination(newTarget, items.slice(1));
 
       if (withItem !== null) {
@@ -111,7 +115,7 @@ export class ItemStack {
     return new ItemStack(newItems);
   }
 
-  modify(denomination: string, quantity: number): ItemStack {
+  modify(denomination: string, quantity: number): ItemStack { // mixing functional here
     const newItems = { ...this.items };
     newItems[denomination] = Math.max((newItems[denomination] ?? 0) + quantity, 0);
     return new ItemStack(newItems);
@@ -120,7 +124,7 @@ export class ItemStack {
   getValue(): number {
     let sum = 0;
     for (const denom of Object.keys(this.items)) {
-      sum = sum + (ItemStack.resource_name_map[denom] * this.items[denom]);
+      sum = sum + (ALL_DENOMINATIONS[denom] * this.items[denom]);
     }
     return sum;
   }
@@ -185,8 +189,8 @@ export class ItemStack {
     let billStack = ItemStack.emptyBillStack();
     let remainder = total;
 
-    for (const denomination of ItemStack.BILL_DENOMINATION_LIST_DESCENDING) {
-      const value = ItemStack.resource_name_map[denomination];
+    for (const denomination of BILL_DENOMINATION_LIST_DESCENDING) {
+      const value = ALL_DENOMINATIONS[denomination];
       const numberOfBills = Math.floor(remainder / value);
       remainder = remainder % value;
       billStack = billStack.modify(denomination, numberOfBills);
@@ -199,8 +203,8 @@ export class ItemStack {
     let chipStack = ItemStack.emptyChipStack();
     let remainder = total;
 
-    for (const denomination of ItemStack.CHIP_DENOMINATION_LIST_DESCENDING) {
-      const value = ItemStack.resource_name_map[denomination];
+    for (const denomination of CHIP_DENOMINATION_LIST_DESCENDING) {
+      const value = ALL_DENOMINATIONS[denomination];
       const numberOfChips = Math.floor(remainder / value);
       remainder = remainder % value;
       chipStack = chipStack.modify(denomination, numberOfChips);
