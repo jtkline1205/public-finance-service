@@ -156,6 +156,7 @@ function getExchangeMapping(
     5: { bill: "fives", chip: "chip_fives", chipRatio: 1 },
     10: { bill: "tens", chip: "chip_fives", chipRatio: 2 },
     20: { bill: "twenties", chip: "chip_fives", chipRatio: 4 },
+    25: { bill: "fifties", chip: "chip_twentyfives", chipRatio: 2 },
     50: { bill: "fifties", chip: "chip_twentyfives", chipRatio: 2 },
     100: { bill: "hundreds", chip: "chip_hundreds", chipRatio: 1 }
   };
@@ -190,7 +191,7 @@ function getExchangeMapping(
         '100_25': { givenType: "chip_hundreds", givenQuantity: 1, receivedType: "chip_twentyfives", receivedQuantity: 4 }
       };
       const key = `${denomination}_${secondDenomination}`;
-      return chipExchanges[key] || chipExchanges['1_5'];
+      return chipExchanges[key];
     }
 
     case 'break-bills': {
@@ -201,7 +202,7 @@ function getExchangeMapping(
         50: { givenType: 'fifties', givenQuantity: 1, receivedType: 'tens', receivedQuantity: 5 },
         100: { givenType: 'hundreds', givenQuantity: 1, receivedType: 'twenties', receivedQuantity: 5 }
       };
-      return billBreaks[denomination] || billBreaks[5];
+      return billBreaks[denomination];
     }
 
     default:
